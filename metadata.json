@@ -1,0 +1,6 @@
+{
+  "name": "[NOMBRE_EMPRESA] - Tecnología con respaldo",
+  "description": "Computadores, laptops, accesorios, limpieza y soporte técnico con garantía por escrito.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

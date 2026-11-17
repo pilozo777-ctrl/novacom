@@ -1,0 +1,342 @@
+PROMPT MAESTRO v3: SITIO WEB DE VENTA DE PRODUCTOS TECNOLÓGICOS
+
+══════════════════════════════════════════
+0. REGLAS DE LECTURA
+══════════════════════════════════════════
+- Este documento es la especificación completa. Cumple cada punto; si algo no está definido, decide con criterio profesional y mantén coherencia con el resto.
+- Orden de prioridad ante conflictos: accesibilidad > claridad > rendimiento > animación > decoración.
+- Todo dato real que falte (nombre, teléfono, marcas, cifras, certificaciones, testimonios, precios definitivos) se escribe como [MARCADOR_EN_MAYÚSCULAS]. Nunca inventes cifras, certificaciones, reseñas ni datos de marcas reales. Los productos y precios de la sección 5 son datos de EJEMPLO y deben poder reemplazarse editando un único arreglo.
+- Idioma del sitio: español neutro latinoamericano. Moneda por defecto: USD ($), configurable en una constante MONEDA.
+
+══════════════════════════════════════════
+1. ROL, OBJETIVO Y REFERENTES
+══════════════════════════════════════════
+Rol: design engineer senior (diseño UI + front-end + motion) especializado en e-commerce de tecnología. Entregas código de producción con criterio propio, no plantillas.
+Objetivo: sitio de venta de tecnología para [NOMBRE_EMPRESA], público en [PAÍS/REGIÓN]. Debe transmitir confianza, solidez técnica y profesionalismo, y dejar una impresión memorable en la primera visita.
+Referentes:
+- corsair.com: fondos oscuros en capas, un solo color de acento, jerarquía tipográfica fuerte, tarjetas de producto con insignias, voz directa de "arma tu equipo".
+- Filosofía de animación de Emil Kowalski: cada animación tiene un propósito; lo frecuente es rápido y sobrio; lo raro puede lucirse; nada de ease-in en entradas; nada de transition: all; entradas desde scale(.95), nunca desde scale(0).
+- Rigor anti "AI slop" de Impeccable: color en OKLCH, neutros con tinte, nada de gradientes morados, bordes laterales de color, rebotes ni glows oscuros; texto con longitud de línea cómoda; objetivos táctiles amplios; encabezados sin saltos.
+
+══════════════════════════════════════════
+2. PROCESO OBLIGATORIO
+══════════════════════════════════════════
+Paso 1. Brief de diseño: al inicio del archivo, en un comentario HTML de 8 líneas máx., declara: público objetivo, tono de marca, 3 decisiones visuales comprometidas, el momento firma (el chip animado del hero), tipografía, paleta y principio de movimiento.
+Paso 2. Construye el sitio completo según esta especificación.
+Paso 3. Autoauditoría (sección 15): corrige todo lo que falle antes de entregar. No narres la auditoría; entrega solo el resultado corregido.
+
+══════════════════════════════════════════
+3. ARQUITECTURA DEL ARCHIVO
+══════════════════════════════════════════
+- Un solo index.html. HTML + CSS + JavaScript vanilla (ES2020+), sin frameworks ni librerías. Único recurso externo permitido: Google Fonts (Montserrat 400, 500, 600, 700, 800, display=swap, con preconnect).
+- CSS organizado con @layer en este orden: reset, tokens, base, layout, components, views, motion, utilities. Un comentario de cabecera por capa.
+- JS organizado en secciones comentadas: DATA (catálogo, servicios, marcas, testimonios, hitos), UTILS (formato de moneda, normalizar texto sin tildes, escapeHTML, clamp, lerp), STORE (carrito con persistencia en localStorage dentro de try/catch), ROUTER, RENDER (funciones que devuelven HTML por vista y componente), UI (modal, drawer, toast, focus trap), MOTION (reveal, contadores, FLIP, spring, slider, vuelo al carrito), BOOT.
+- Íconos e ilustraciones como <symbol> en un sprite SVG oculto al inicio del <body>, reutilizados con <use>.
+- Delegación de eventos: un listener de click y uno de keydown en document; nada de onclick inline.
+- Todo texto de datos se inserta con escapeHTML.
+- Si el límite de salida impide entregar el archivo completo, divídelo en PARTE 1 (HTML + CSS) y PARTE 2 (JS), cada una con un marcador final exacto "[CONTINÚA EN PARTE 2]" / "[FIN]". Prohibido resumir, abreviar con "..." u omitir código.
+
+══════════════════════════════════════════
+4. ENRUTADOR Y MAPA DE ENLACES (TARJETAS ENLAZADAS)
+══════════════════════════════════════════
+Navegación por hash, sin recargar. Rutas:
+- #/inicio (por defecto)
+- #/quienes-somos
+- #/productos con parámetros opcionales: ?cat=cpu|laptops|limpieza|accesorios|usb|mas  &marca=NOMBRE  &q=TEXTO  &orden=relevancia|precio-asc|precio-desc|novedad  &ofertas=1  &disp=1
+- #/producto/<id> (abre el modal de detalle sobre #/productos)
+- #/servicios (misma vista Productos y Servicios, con scroll a la sección Servicios)
+- #/servicio/<id> (modal de detalle del servicio)
+- #/cotizar?servicio=<id>&producto=<id> (modal de formulario con valores preseleccionados)
+- #/carrito (drawer del carrito)
+- #/garantia y #/terminos (modales con [TEXTO_LEGAL])
+Pestaña activa del header: Inicio para #/inicio; Quiénes somos para #/quienes-somos; Productos y Servicios para #/productos, #/producto/*, #/servicios, #/servicio/*, #/cotizar.
+Comportamiento del router:
+- Al cambiar de vista: actualiza document.title y la meta description, lleva el scroll al inicio, mueve el foco al <h1> de la vista (tabindex="-1") y anuncia el cambio en una región aria-live="polite".
+- Los filtros del catálogo viven en el hash (compartibles, funcionan con atrás/adelante). Cambios de filtro usan replaceState; abrir un producto o servicio usa pushState, así "Atrás" cierra el modal.
+- Un hash inválido redirige a #/inicio.
+- Cerrar un modal: si se abrió desde dentro del sitio, history.back(); si se llegó por enlace directo, ir a #/productos.
+
+REGLA DE TARJETAS: toda tarjeta es un enlace real (<a href="#/...">) con patrón "stretched link": el <a> está en el título de la tarjeta y su ::after cubre toda la tarjeta (position:absolute; inset:0). Los botones internos (Agregar, Solicitar) llevan position:relative; z-index:2 para funcionar de forma independiente. Ctrl/Cmd+clic, foco por teclado, Enter y lectores de pantalla funcionan. Estados :hover y :focus-within idénticos.
+
+Mapa de destinos por tarjeta:
+INICIO
+- Hero: "Ver productos" → #/productos. "Hablar con un asesor" → WhatsApp [NÚMERO] con texto precargado.
+- Barra de confianza (4 tarjetas): Garantía → #/garantia. Envíos → #/terminos. Soporte técnico → #/servicio/soporte. Pago seguro → #/terminos.
+- Categorías (6): cada una → #/productos?cat=<categoría>.
+- Destacados (4 productos: lap-02, cpu-02, usb-02, acc-02): → #/producto/<id>. Enlace "Ver todo el catálogo" → #/productos.
+- Por qué elegirnos (4): Asesoría real → #/servicio/asesoria. Soporte posventa → #/servicio/soporte. Garantía por escrito → #/garantia. Venta a empresas → #/servicio/corporativo.
+- Sección Limpieza: 3 tarjetas (cle-01, cle-02, cle-03) → #/producto/<id>; enlace "Ver todo en Limpieza" → #/productos?cat=limpieza; enlace "¿Prefieres que lo hagamos nosotros?" → #/servicio/mantenimiento.
+- Marcas (6 tarjetas) → #/productos?marca=<marca>.
+- Testimonios (3): cada tarjeta enlaza al producto o servicio que menciona (#/producto/<id> o #/servicio/<id>).
+- CTA final → #/cotizar. Secundario → #/productos.
+QUIÉNES SOMOS
+- Valores (3): Transparencia → #/garantia. Soporte real → #/servicio/soporte. Asesoría honesta → #/servicio/asesoria.
+- Equipo (3 tarjetas): → WhatsApp con texto "Hola [NOMBRE_PERSONA], quiero información".
+- Marcas autorizadas (6) → #/productos?marca=<marca>.
+- CTA final → #/cotizar y #/productos.
+PRODUCTOS Y SERVICIOS
+- Tarjeta de producto → #/producto/<id>.
+- Chips de categoría y marca → modifican el hash (?cat=, ?marca=).
+- Tarjeta de servicio → #/servicio/<id>; su botón "Solicitar" → #/cotizar?servicio=<id>.
+- Modal de producto: breadcrumb (Productos › Categoría › Nombre) con enlaces a #/productos y #/productos?cat=<cat>. Bloque "Combínalo con" (3 tarjetas) → #/producto/<id>. Bloque "Servicios recomendados" (2 tarjetas) → #/servicio/<id>. Bloque "Cuida tu equipo" (2 tarjetas de limpieza, solo en CPU, laptops y monitores) → #/producto/<id>. En productos de limpieza, el bloque "Ideal para" (2 tarjetas de equipos) → #/producto/<id>.
+- Modal de servicio: lista "Incluye", precio de partida, bloque "Productos relacionados" (3 tarjetas) → #/producto/<id>, botón "Cotizar este servicio" → #/cotizar?servicio=<id>.
+- Carrito: el nombre de cada ítem → #/producto/<id>. "Seguir comprando" cierra el drawer.
+FOOTER
+- Columna Productos: 6 enlaces a las categorías. Columna Empresa: Inicio, Quiénes somos, Servicios, Garantía, Términos. Contacto: WhatsApp, correo, dirección, horario.
+
+══════════════════════════════════════════
+5. DATOS (ARREGLOS JS, EDITABLES)
+══════════════════════════════════════════
+Categorías (clave: nombre): cpu: "CPU y computadores de escritorio" | laptops: "Laptops" | limpieza: "Limpieza y mantenimiento" | accesorios: "Accesorios" | usb: "USB y almacenamiento" | mas: "Más tecnología".
+Campos de producto: id, cat, nombre, marca ("[MARCA]"), specs (2 líneas), precio, antes (opcional), badge (Nuevo | Oferta | Preventa | Agotado | Más vendido | null), rating, reseñas, stock, ilustracion (clave de symbol SVG), relacionados[], servicios[], cuidar[] (equipos) o idealPara[] (limpieza), incluye[] (3 ítems), garantiaMeses "[GARANTÍA_MESES]".
+Productos de ejemplo (20). Formato: id | nombre | spec 1 | spec 2 | precio | antes | badge | rating (reseñas) | stock
+CPU
+- cpu-01 | Torre Office Pro | Procesador de 6 núcleos · 16 GB RAM | SSD 512 GB · Windows 11 Pro | 549 | , | Más vendido | 4.7 (86) | 12 | rel: acc-01, acc-02, mas-01 | srv: migracion, corporativo | cuidar: cle-02, cle-03
+- cpu-02 | Torre Gamer Vortex | 8 núcleos · 32 GB RAM | SSD NVMe 1 TB · GPU dedicada 8 GB | 1199 | , | Nuevo | 4.8 (31) | 5 | rel: acc-02, acc-03, mas-01 | srv: ensamblaje, asesoria | cuidar: cle-02, cle-03
+- cpu-03 | Mini PC Compacto | 4 núcleos · 8 GB RAM | SSD 256 GB · 12 × 12 cm | 289 | 349 | Oferta | 4.5 (54) | 20 | rel: acc-04, mas-01, usb-01 | srv: migracion, soporte | cuidar: cle-02, cle-04
+LAPTOPS
+- lap-01 | Laptop Estudiante 15.6" | Pantalla FHD · 8 GB RAM | SSD 256 GB · batería para jornada de clases | 429 | , | , | 4.4 (112) | 18 | rel: acc-01, acc-03, usb-01 | srv: migracion, soporte | cuidar: cle-01, cle-04
+- lap-02 | Laptop Creator 16" | Pantalla 2.5K · 32 GB RAM | SSD 1 TB · GPU dedicada | 1349 | , | Nuevo | 4.9 (19) | 4 | rel: usb-02, acc-04, mas-01 | srv: asesoria, migracion | cuidar: cle-01, cle-02
+- lap-03 | Laptop Ejecutiva 14" | Aluminio · 1.3 kg · 16 GB RAM | SSD 512 GB · lector de huella | 799 | 899 | Oferta | 4.6 (47) | 9 | rel: acc-04, acc-01, usb-02 | srv: corporativo, soporte | cuidar: cle-01, cle-04
+LIMPIEZA
+- cle-01 | Kit Limpiapantallas 3 en 1 | Spray 100 ml · paño microfibra 30 × 30 cm | Cepillo suave incluido | 9.90 | , | Más vendido | 4.8 (203) | 80 | rel: cle-02, cle-04, cle-03 | srv: mantenimiento | idealPara: lap-01, mas-01
+- cle-02 | Aire Comprimido 400 ml | Boquilla extensible · sin residuos | Para teclados, ventiladores y puertos | 7.50 | , | , | 4.6 (140) | 60 | rel: cle-01, cle-04, cle-03 | srv: mantenimiento | idealPara: cpu-01, cpu-02
+- cle-03 | Pasta Térmica 4 g con Espátula | Alta conductividad térmica | Jeringa 4 g · para CPU y GPU | 6.90 | , | Nuevo | 4.7 (66) | 35 | rel: cle-02, cle-01, cle-04 | srv: mantenimiento, ensamblaje | idealPara: cpu-02, lap-02
+- cle-04 | Mini Aspiradora USB para Teclados | Recargable por USB-C | 3 boquillas · cepillo incluido | 14.90 | 18.90 | Oferta | 4.3 (58) | 22 | rel: cle-01, cle-02, cle-03 | srv: mantenimiento | idealPara: lap-01, lap-03
+ACCESORIOS
+- acc-01 | Mouse Inalámbrico Ergonómico | 2.4 GHz y Bluetooth · 1600 DPI | Batería recargable USB-C | 19.90 | , | , | 4.5 (178) | 45 | rel: acc-02, acc-03, acc-04
+- acc-02 | Teclado Mecánico 75% | Switches lineales · retroiluminado | USB-C · cable desmontable | 54.90 | , | Nuevo | 4.7 (64) | 17 | rel: acc-01, acc-03, cle-04
+- acc-03 | Audífonos con Micrófono | Micrófono con reducción de ruido | USB-A y jack 3.5 mm | 29.90 | , | , | 4.4 (92) | 30 | rel: acc-01, acc-02, acc-04
+- acc-04 | Hub USB-C 7 en 1 | HDMI 4K · 3 puertos USB-A | Lector SD/microSD · carga pass-through | 34.90 | 44.90 | Oferta | 4.6 (121) | 25 | rel: lap-03, usb-02, usb-03
+USB Y ALMACENAMIENTO
+- usb-01 | Memoria USB 3.2 de 64 GB | USB-A · cuerpo metálico | Tapa deslizante | 8.90 | , | , | 4.5 (260) | 150 | rel: usb-03, usb-02, acc-04
+- usb-02 | SSD Externo Portátil 1 TB | USB-C 3.2 · tamaño de bolsillo | Incluye cables C a C y C a A | 89.00 | , | Más vendido | 4.8 (97) | 14 | rel: lap-02, usb-01, acc-04 | srv: migracion
+- usb-03 | MicroSD 128 GB con Adaptador | Clase U3 · V30 | Adaptador SD incluido | 12.90 | , | , | 4.6 (88) | 70 | rel: usb-01, usb-02, acc-04
+MÁS TECNOLOGÍA
+- mas-01 | Monitor 24" FHD IPS | 75 Hz · HDMI y DisplayPort | Base con inclinación ajustable | 129 | , | , | 4.5 (73) | 11 | rel: cpu-01, acc-04, lap-03 | cuidar: cle-01, cle-02
+- mas-02 | Router WiFi 6 Doble Banda | 4 antenas · 4 puertos LAN | Configuración desde app | 59 | , | Nuevo | 4.4 (41) | 16 | rel: mas-01, cpu-03, acc-04 | srv: soporte
+- mas-03 | UPS 650 VA con 4 Tomas | Protección contra picos | Regulador de voltaje integrado | 69 | , | Agotado | 4.3 (28) | 0 | rel: cpu-01, mas-02, mas-01 | srv: soporte
+Reglas de datos: "Agotado" = stock 0. "Quedan N" se muestra en color --warning cuando stock ≤ 5. El porcentaje de descuento se calcula de precio y antes, redondeado. "Más vendido" y "Nuevo" son insignias, no filtros.
+
+Servicios (6). Campos: id, nombre, resumen (1 línea), desde (precio de ejemplo o "A cotizar"), incluye[3], productos[3], icono.
+- ensamblaje | Ensamblaje a medida | Tu PC armada con componentes compatibles y probada | Desde $35 | Selección de componentes según tu presupuesto · Ensamblaje y gestión de cables · Pruebas de estabilidad antes de entregar | cpu-02, cpu-01, cle-03
+- mantenimiento | Mantenimiento preventivo y limpieza interna | Menos polvo, mejores temperaturas | Desde $15 | Limpieza interna de polvo · Cambio de pasta térmica · Revisión de ventiladores y temperaturas | cle-02, cle-03, cle-04
+- soporte | Soporte técnico | Diagnóstico y solución, remoto o en sitio | Desde $10 | Diagnóstico del problema · Soporte remoto o en sitio · Informe con lo realizado | mas-02, mas-03, cpu-03
+- migracion | Formateo y migración de datos | Cambia de equipo sin perder tus archivos | Desde $20 | Respaldo de tus archivos · Instalación de sistema y controladores · Verificación al terminar | usb-02, lap-01, cpu-01
+- asesoria | Asesoría de compra | Te recomendamos según tu uso y presupuesto | Gratis | Entrevista corta por WhatsApp · Comparativa de 2 o 3 opciones · Sin compromiso | lap-01, cpu-01, lap-02
+- corporativo | Venta corporativa | Equipamiento para empresas e instituciones | A cotizar | Cotización por volumen · Factura [DATOS_FISCALES] · Condiciones de garantía por lote | lap-03, cpu-01, mas-02
+Todos los precios de servicios se marcan en el código como "[PRECIO_REAL]".
+
+Marcas (6): [MARCA_1] a [MARCA_6] (logotipo = texto en Montserrat 700 con letter-spacing, en escala de grises, hasta que se entreguen logos).
+Testimonios (3, marcadores): [TESTIMONIO_1/2/3] con [NOMBRE], [CIUDAD], estrellas, y enlace: 1 → lap-01, 2 → servicio mantenimiento, 3 → servicio corporativo.
+Hitos (5): [AÑO] + [HITO] para la línea de tiempo.
+Equipo (3): [NOMBRE], [CARGO], iniciales en círculo (sin fotos inventadas) hasta recibir [FOTO].
+
+══════════════════════════════════════════
+6. SISTEMA DE DISEÑO
+══════════════════════════════════════════
+6.1 Color (variables en :root, definidas en OKLCH con fallback hex en una declaración previa). Valores OKLCH aproximados; verifica contraste y ajusta.
+Fondos y superficies (neutros siempre con tinte azul, croma 0.02-0.03, matiz ~265; prohibido gris puro):
+- --bg #070B14 (oklch .16 .025 265) | --bg-deep #0A1020 | --surface #0F1729 | --surface-2 #16203A | --border #1F2A44 | --border-strong #2B3A5E
+Texto:
+- --text #F4F7FB | --text-soft #A9B4CC | --text-faint #6B7893 (solo para metadatos no esenciales)
+Marca y acción:
+- --brand #2F6BFF (oklch .58 .20 262) | --brand-hover #4D82FF | --brand-deep #1B3FA0 | --brand-soft rgba(47,107,255,.14)
+- --cta #19C37D (oklch .74 .17 160) | --cta-hover #35D894 | --on-cta #04120B | --cta-soft rgba(25,195,125,.14)
+Estados: --success #22C55E | --warning #F59E0B | --danger #EF4444
+Bandas claras alternas (color-scheme: light dentro de la banda): fondo #F5F7FB, superficie #FFFFFF, borde #DDE3EF, texto #0B1220, texto suave #46526B.
+Uso del color: azul = marca, enlaces, foco, estados activos. Verde = SOLO acción de compra y confirmaciones. Nunca ambos como relleno grande en la misma tarjeta. Foco visible en toda la interfaz: outline 2px --brand-hover, offset 2px.
+6.2 Tipografía (Montserrat; fallback "Helvetica Neue", Arial, sans-serif)
+- Display: clamp(2.5rem, 1.2rem + 5vw, 4rem) / 1.05 / peso 800 / letter-spacing -0.02em
+- H1: clamp(2rem, 1.2rem + 2.6vw, 2.75rem) / 1.1 / 700 / -0.015em
+- H2: clamp(1.5rem, 1rem + 1.6vw, 2rem) / 1.2 / 700
+- H3: 1.25rem / 1.3 / 600
+- Cuerpo: 1rem (16px) / 1.6 / 400; cuerpo grande 1.125rem en hero y subtítulos.
+- Pequeño: .875rem / 1.5. Etiquetas (eyebrow): .6875rem (11px) / 1 / 600 / MAYÚSCULAS / letter-spacing .12em / color --brand.
+- Precios: font-variant-numeric: tabular-nums. Títulos: text-wrap: balance. Párrafos: text-wrap: pretty; max-width 68ch.
+6.3 Espaciado y layout
+- Escala: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128 (--s-1 a --s-10). Padding vertical de sección: 96px escritorio, 64px móvil.
+- Contenedor: max-width 1280px; padding-inline clamp(16px, 4vw, 40px). Grilla de 12 columnas, gap 24px (16px móvil).
+- Breakpoints: 480, 768, 1024, 1280 (mobile-first, min-width).
+- Bandas: alternar oscuro (--bg) / claro / oscuro profundo (--bg-deep) para dar ritmo.
+6.4 Forma y profundidad
+- Radios: botones 6px, tarjetas 10px, modales 14px, chips 999px. Bordes de 1px. Sombras solo en modal y drawer: 0 24px 64px rgba(0,0,0,.5). Sin glows ni resplandores.
+- Hover de tarjeta: translateY(-4px), borde --brand, fondo --surface-2.
+6.5 Íconos e ilustraciones
+- Íconos: SVG de trazo 1.75px, esquinas redondeadas, 24×24, currentColor. Necesarios: carrito, buscar, menú, cerrar, flecha, check, escudo (garantía), camión (envíos), auricular (soporte), tarjeta (pago), herramienta, WhatsApp, estrella, filtro, chevron.
+- Ilustraciones de producto (17 <symbol>, viewBox 0 0 240 180, SIN cajas grises): torre, mini PC, laptop, spray/lata de aire, kit limpiapantallas, jeringa de pasta térmica, mini aspiradora, mouse, teclado, audífonos, hub USB-C, memoria USB, SSD externo, microSD, monitor, router, UPS. Construidas con rect, circle y path; 3 tonos de la paleta (--surface-2, --border-strong, --text-soft) y un detalle de acento en --brand. Estilo geométrico, trazos limpios, coherente entre todas.
+
+══════════════════════════════════════════
+7. COMPONENTES (ESPECIFICACIÓN)
+══════════════════════════════════════════
+7.1 Header: altura 72px (64px móvil), fondo --bg sólido (sin blur de cristal), borde inferior 1px --border que aparece al hacer scroll (180ms). Izquierda: logo [LOGO] (SVG simple + [NOMBRE_EMPRESA]). Centro: 3 pestañas (14px/600, padding 8px 16px) con indicador de 2px en --brand que se desliza. Derecha: botón buscar (abre el buscador del catálogo), carrito con contador, y botón CTA verde "Cotizar" (oculto <768px). Debajo del header, barra de progreso de scroll de 2px en --brand. Menú móvil: panel desde la derecha, 100% de alto, enlaces de 18px/600, cierre con Esc.
+7.2 Botones: alto 48px (md), 40px (sm), 56px (lg); padding-inline 24px; radio 6px; peso 600; sin MAYÚSCULAS. Variantes: primario (fondo --cta, texto --on-cta), secundario (borde 1px --border-strong, texto --text, hover borde --brand), terciario (texto + flecha que avanza 4px en hover). Estados: hover 150ms; active scale(.97) 100ms; disabled opacity .5 sin hover; loading = spinner de 16px que gira a 600ms por vuelta.
+7.3 Chips de filtro: alto 36px, padding 0 16px, borde 1px --border, texto 14px; activo: fondo --brand-soft, borde --brand, texto --text. Con contador opcional (ej. "Laptops 3").
+7.4 TARJETA DE PRODUCTO (<article>)
+- Contenedor: fondo --surface, borde 1px --border, radio 10px, padding 16px, gap 12px.
+- Media: aspect-ratio 4/3, fondo --bg-deep, radio 8px, ilustración SVG centrada; insignia arriba-izquierda a 12px (altura 24px, 11px/700, MAYÚSCULAS; colores: Nuevo = --brand fondo, Oferta = --cta fondo, Preventa = borde --brand sin relleno, Más vendido = --surface-2 con texto --text, Agotado = --text-faint sobre --surface-2).
+- Cuerpo: marca (eyebrow 11px); nombre 16px/600, máximo 2 líneas (line-clamp), es el <a> con stretched link; specs en 2 líneas de 13px --text-soft; fila de rating (5 estrellas SVG de 14px en --warning relleno, "4.7 (86)" en 13px).
+- Precio: 20px/700 tabular-nums; si hay oferta: precio anterior tachado 14px --text-faint y chip "-18%" en --cta-soft/--cta.
+- Stock: punto de 8px + texto 12px ("En stock" --success, "Quedan 3" --warning).
+- Botón "Agregar al carrito" (sm, ancho completo, primario). Agotado: media a opacity .5 y escala de grises, botón reemplazado por "Avisarme por WhatsApp" (secundario).
+- Responsive: 1 columna <420px; 2 columnas 420-1023px (ocultar segunda línea de specs <640px); 3 columnas 1024-1279px; 4 columnas ≥1280px.
+7.5 TARJETA DE CATEGORÍA: alto mínimo 220px; fondo --surface; ilustración grande a la derecha (≈55% del ancho) recortada por el borde; nombre H3 abajo-izquierda; subtexto "N productos" 13px; flecha circular de 40px que aparece/avanza en hover. La primera tarjeta de la grilla (CPU y computadores) ocupa 2 columnas × 2 filas (jerarquía, no 6 tarjetas iguales).
+7.6 TARJETA DE SERVICIO: ícono de 40px en un cuadrado --brand-soft de 56px; nombre H3; resumen 14px; lista "Incluye" de 3 ítems con check; fila inferior: "Desde $X" + botón terciario "Solicitar".
+7.7 TARJETAS DE CONFIANZA (barra, 4): ícono 32px, cifra o garantía en 18px/700, descripción 13px. Se leen como enlaces (destinos en la sección 4).
+7.8 TARJETA DE VALOR / "POR QUÉ ELEGIRNOS": número grande 40px/800 en --brand, título H3, 2 líneas de texto, enlace terciario.
+7.9 TARJETA DE TESTIMONIO: estrellas, cita en 16px (máx. 3 líneas en la tarjeta), nombre y ciudad, y bajo ellos "Producto: [nombre]" como enlace.
+7.10 TARJETA DE EQUIPO: círculo de 72px con iniciales (--surface-2), nombre, cargo, enlace "Escribir por WhatsApp".
+7.11 TARJETA DE MARCA: 160×80px, texto de marca en escala de grises que pasa a --text en hover (200ms), enlace al filtro.
+7.12 Modal (producto, servicio, cotizar, garantía, términos): ancho máx. 960px (producto) / 560px (formularios); radio 14px; backdrop rgba(3,6,12,.72); focus trap; Esc cierra; clic en el backdrop cierra; scroll del body bloqueado; foco inicial en el título; al cerrar, el foco vuelve al elemento que lo abrió.
+   Modal de producto (escritorio: 2 columnas 55/45): izquierda galería (imagen principal 4/3 + 3 miniaturas: vista principal, detalle, escala); derecha: breadcrumb, H2 nombre, marca, rating, precio, estado de stock, 2 líneas de resumen, selector de cantidad (stepper 40px, mín. 1, máx. stock), botón "Agregar al carrito" (lg, verde) y "Preguntar por WhatsApp" (secundario). Debajo, a ancho completo: tabla de especificaciones (6 filas, generadas de specs + datos), bloque "Qué incluye" (3 ítems), bloque "Envío y garantía" (con enlace a #/garantia), y las tarjetas enlazadas: "Combínalo con", "Servicios recomendados", "Cuida tu equipo" o "Ideal para".
+7.13 Drawer del carrito: 420px de ancho (100% en móvil), desde la derecha. Lista de ítems (miniatura 64px, nombre enlazado, precio, stepper, quitar), resumen con subtotal y nota "Envío a coordinar", botón primario "Pedir por WhatsApp" (genera https://wa.me/[NÚMERO]?text= con líneas "2 × Nombre, $X" y total, con encodeURIComponent) y secundario "Seguir comprando". Estado vacío: ilustración + "Tu carrito está vacío" + botón "Ver productos".
+7.14 Toast: abajo-centro en móvil, abajo-derecha en escritorio, 320px, máx. 3 apilados, role="status", se cierra a los 3.5s (se pausa en hover/foco).
+7.15 Formulario de cotización: campos nombre*, WhatsApp* (solo dígitos y +, validar longitud), correo (opcional), servicio (select preseleccionado), producto de interés (select opcional), mensaje (textarea 4 filas). Labels visibles arriba, ayuda en 12px. Validación al salir del campo (blur) y al enviar; mensaje de error bajo el campo con role="alert" que dice qué corregir ("Escribe tu WhatsApp con código de país, por ejemplo +593..."). Éxito: check animado + "Listo, [NOMBRE]. Te escribimos por WhatsApp en [TIEMPO_RESPUESTA]" y botón que abre WhatsApp con el resumen.
+7.16 Skeleton: bloques de --surface-2 con shimmer horizontal (1.4s, linear, infinite), solo en la carga inicial del catálogo (≈500ms) y respetando reduced-motion.
+7.17 Estado vacío del catálogo: ilustración + "No encontramos resultados para "[búsqueda]"" + sugerencias (chips de categorías) + botón "Limpiar filtros".
+7.18 Footer: fondo --bg-deep, borde superior 1px --border; 4 columnas (marca y descripción de 2 líneas | Productos | Empresa | Contacto), fila inferior con métodos de pago [LOGOS_PAGO] como texto y "© [AÑO] [NOMBRE_EMPRESA]. Todos los derechos reservados.".
+
+══════════════════════════════════════════
+8. VISTA INICIO (ORDEN Y DETALLE)
+══════════════════════════════════════════
+8.1 HERO (alto mín. 88vh, grilla 12 col: texto 6, visual 6; en móvil texto arriba y visual debajo)
+- Eyebrow: "TECNOLOGÍA CON RESPALDO"
+- H1 (display): "Computadores, laptops y accesorios con garantía y soporte técnico real"
+- Subtítulo: "Compra en [NOMBRE_EMPRESA] y recibe asesoría antes de pagar y ayuda después de la entrega. Garantía de [GARANTÍA_MESES] meses en equipos."
+- Botones: "Ver productos" (lg, verde) y "Hablar con un asesor" (lg, secundario).
+- Línea de confianza bajo botones: 3 micro-datos en 13px con ícono (Garantía por escrito · Soporte por WhatsApp · Facturación [DATOS_FISCALES]).
+- Visual: chip/CPU SVG de 560×560 (ver animaciones, momento firma) con 4 tarjetas flotantes pequeñas alrededor ("Laptops", "CPU", "USB", "Limpieza") que son enlaces a sus categorías.
+8.2 BARRA DE CONFIANZA: 4 tarjetas en una fila (2×2 móvil), fondo --surface, borde 1px: "[12] meses de garantía" | "Envíos a [ZONAS]" | "Soporte técnico por WhatsApp" | "Pago seguro [MÉTODOS]". Cifras con contador animado cuando son numéricas.
+8.3 CATEGORÍAS: eyebrow "CATÁLOGO", H2 "Encuentra lo que necesitas", 1 línea de apoyo. Grilla asimétrica de 6 tarjetas (sección 7.5).
+8.4 DESTACADOS: H2 "Lo más buscado". Fila de 4 tarjetas de producto (lap-02, cpu-02, usb-02, acc-02) y enlace "Ver todo el catálogo →".
+8.5 BANDA CLARA "POR QUÉ ELEGIRNOS": H2 "Compras con tranquilidad", 4 tarjetas de valor (7.8) con los textos: 01 Asesoría real ("Te recomendamos el equipo según lo que vas a hacer, no el más caro.") | 02 Soporte posventa ("Si algo falla, escribes y respondemos.") | 03 Garantía por escrito ("Condiciones claras antes de pagar.") | 04 Venta a empresas ("Cotización por volumen y factura.").
+8.6 SECCIÓN LIMPIEZA (fondo --bg-deep): izquierda H2 "Un equipo limpio rinde más y dura más" + 2 líneas de texto + 3 tarjetas pequeñas (cle-01, cle-02, cle-03) + enlaces "Ver todo en Limpieza" y "¿Prefieres que lo hagamos nosotros?". Derecha: slider antes/después (ver animaciones).
+8.7 MARCAS: eyebrow "MARCAS", fila de 6 tarjetas de marca (marquee en móvil).
+8.8 TESTIMONIOS: H2 "Lo que dicen nuestros clientes", 3 tarjetas (7.9).
+8.9 CTA FINAL (banda --brand-deep): H2 "¿No sabes qué equipo necesitas?", texto de 1 línea, botón verde "Pedir asesoría gratis" → #/cotizar?servicio=asesoria.
+8.10 FOOTER.
+
+══════════════════════════════════════════
+9. VISTA QUIÉNES SOMOS
+══════════════════════════════════════════
+9.1 Hero corto (alto mín. 56vh): eyebrow "QUIÉNES SOMOS", H1 "Tecnología en la que puedes confiar", párrafo de 2 líneas con [PROPÓSITO_EMPRESA]. Cifras en una fila (4 contadores): [N]+ clientes, [N] años de experiencia, 20+ productos en catálogo (calculado desde el arreglo), [N] ciudades atendidas.
+9.2 Historia: línea de tiempo vertical con 5 hitos ([AÑO] + [HITO]); la línea de 2px se dibuja con el scroll (scaleY ligada al progreso de la sección) y cada hito aparece al cruzar el 60% del viewport.
+9.3 Misión, visión y valores: 3 tarjetas enlazadas (sección 4).
+9.4 Cómo trabajamos: 4 pasos horizontales numerados (Escuchamos tu necesidad → Recomendamos opciones → Entregamos y configuramos → Te acompañamos después), conectados por una línea que se dibuja al entrar en vista.
+9.5 Equipo: 3 tarjetas (7.10).
+9.6 Marcas autorizadas y certificaciones: tarjetas de marca + lista de [CERTIFICACIONES] (si no hay, omitir el bloque).
+9.7 CTA final de contacto con botones "Cotizar" y "Ver productos"; datos de contacto: [DIRECCIÓN], [HORARIO], [TELÉFONO], [EMAIL].
+
+══════════════════════════════════════════
+10. VISTA PRODUCTOS Y SERVICIOS
+══════════════════════════════════════════
+10.1 Encabezado: H1 "Productos y servicios", subtítulo de 1 línea, y dos anclas internas ("Productos", "Servicios") como control segmentado sticky bajo el header (alto 48px) que resalta la sección visible.
+10.2 Herramientas del catálogo (sticky bajo el control segmentado en escritorio):
+- Buscador (alto 48px, ícono, placeholder "Busca laptops, USB, aire comprimido..."); filtra EN VIVO sin animación y sin debounce, normalizando tildes y mayúsculas; busca en nombre, marca, categoría y specs; resalta coincidencias con <mark> sutil (fondo --brand-soft).
+- Chips de categoría (Todos + 6) con contador. Chips de marca. Interruptor "Solo ofertas" y casilla "Solo disponibles".
+- Selector de orden (Relevancia, Precio: menor a mayor, Precio: mayor a menor, Novedades). Contador "Mostrando X de Y productos" en aria-live="polite". Botón "Limpiar filtros" visible solo si hay filtros activos.
+- En móvil: filtros dentro de un panel inferior (bottom sheet) con botón "Filtros (N)".
+10.3 Grilla de productos: tarjetas (7.4). Se muestran 12 y un botón "Ver 8 más" (secundario) carga el resto. Cambiar filtros reordena con FLIP.
+10.4 Sección SERVICIOS (id="servicios"): fondo claro, eyebrow "SERVICIOS", H2 "No solo vendemos: instalamos, limpiamos y damos soporte", 6 tarjetas de servicio (grilla 3×2; 2×3 en tablet; 1 col móvil). Debajo, banda de CTA: "¿Necesitas algo a medida?" con botón "Pedir cotización" → #/cotizar.
+10.5 Modales de producto y servicio con tarjetas enlazadas (7.12 y sección 4).
+
+══════════════════════════════════════════
+11. ANIMACIÓN Y MOVIMIENTO (PARTE CENTRAL)
+══════════════════════════════════════════
+11.1 Principios
+- Antes de animar, define el propósito: feedback, explicación, continuidad espacial o deleite. Lo que se repite muchas veces es rápido y sobrio; lo que se ve una vez puede lucirse.
+- Tokens: --ease-out: cubic-bezier(.23,1,.32,1) | --ease-in-out: cubic-bezier(.77,0,.175,1) | --d-fast: 150ms | --d-base: 220ms | --d-slow: 500ms | --d-hero: 800ms.
+- Prohibido: ease-in en entradas, transition: all, rebote o elástico, animar desde scale(0), animar width/height/top/left. Se anima transform y opacity (clip-path y filter con moderación). will-change solo mientras dura la animación.
+- Entradas desde scale(.95)-(.96) + opacity; la salida dura ~60% de la entrada; los elementos emergentes parten del origen de su disparador (transform-origin).
+- Stagger: 40-80ms entre elementos (variable CSS --i, máximo 8 elementos); secuencia total máxima 1.2 s.
+- Las animaciones de interacción deben ser interrumpibles (transiciones CSS, no keyframes).
+- Springs (JS) solo para gestos y efectos decorativos: stiffness 170, damping 22 (sin rebote visible).
+11.2 Niveles
+- A, frecuente (hover, foco, filtros, botones, navegación, búsqueda): 120-200ms, nada decorativo. Presionar un botón: scale(.97) en 100ms. La búsqueda al escribir, los atajos de teclado y los cambios de precio NO se animan.
+- B, ocasional (modal, drawer, toast, cambio de pestaña, menú móvil): 200-280ms.
+- C, impacto (hero, scroll, contadores, slider): 450-900ms, coreografiado, una vez por visita.
+11.3 Catálogo de animaciones a implementar (todas obligatorias salvo indicación)
+1. HERO, titular: máscara clip-path inset por línea; cada línea sube desde translateY(100%) a 0 en 700ms con --ease-out y stagger de 90ms; luego subtítulo y botones (fade + translateY(12px), 500ms, stagger 80ms).
+2. HERO, chip firma (SVG 560×560): (a) cuerpo del chip aparece con scale(.95)→1 + opacity en 500ms; (b) 32 pistas de circuito (paths) se dibujan con stroke-dasharray/dashoffset calculado con getTotalLength(), 1.1 s, stagger de 25ms, trazo 2px en --border-strong; (c) cuando termina, un pulso de luz (segmento de trazo en --brand, 40px de largo) recorre cada pista con offset-path/stroke-dashoffset, 2.4 s lineal, desfasado por pista, en bucle; (d) el chip tiene un texto central "[NOMBRE_CHIP]" o el logo. Las 4 tarjetas flotantes entran con stagger de 100ms desde translateY(16px). Los bucles se pausan fuera de pantalla (IntersectionObserver) y se desactivan con reduced-motion.
+3. HERO, parallax: el chip y las tarjetas se desplazan hasta ±12px y rotan hasta ±3° siguiendo el puntero con spring (solo @media (hover:hover) and (pointer:fine)); se anula al salir el puntero.
+4. CONTADORES: al entrar en vista, cuentan de 0 al valor en 1.2 s con easeOutQuart usando requestAnimationFrame y tabular-nums; solo una vez.
+5. SCROLL REVEAL: elementos con [data-reveal] entran con translateY(16px)→0 + opacity, 500ms --ease-out, IntersectionObserver (threshold .15, rootMargin "0px 0px -8% 0px"), una sola vez. Las grillas usan stagger con --i. Barra de progreso de scroll en el header (transform: scaleX).
+6. TARJETAS: hover (solo con hover:hover) translateY(-4px), borde a --brand, imagen scale(1.04), 250ms --ease-out; la flecha de la tarjeta de categoría avanza 4px. Las categorías usan una transición de 200ms en el fondo.
+7. AGREGAR AL CARRITO: (a) botón en press scale(.97), tras el clic muestra spinner 600ms y luego "Agregado" con check (1.2 s) y vuelve al texto original; (b) la miniatura del producto "vuela" hasta el ícono del carrito (clon fixed animado con Web Animations API, 500ms, translate + scale 1→.3, --ease-out) y se elimina al terminar; (c) el contador del carrito hace un pulso 1→1.15→1 en 280ms; (d) aparece un toast ("[Nombre] agregado al carrito" + enlace "Ver carrito").
+8. PESTAÑAS: el indicador del header se desliza entre pestañas (transform + width medidos con getBoundingClientRect, 250ms --ease-out); el contenido saliente hace fade-out en 120ms y el entrante sube desde translateY(8px) con fade-in en 220ms.
+9. FILTROS: al cambiar filtros, reorden con técnica FLIP (240ms, --ease-out); las tarjetas que salen hacen opacity + scale(.95) en 150ms, las nuevas entran con scale(.96)→1 + opacity en 220ms. Skeleton con shimmer en la primera carga (≈500ms).
+10. MODALES: entran desde scale(.96) + opacity en 220ms con transform-origin en la posición del disparador (si el disparador es una tarjeta) o al centro; salen en 140ms. El backdrop hace fade en 200ms. Drawer del carrito y menú móvil: translateX(100%)→0 en 260ms --ease-out, salida en 180ms.
+11. SLIDER ANTES/DESPUÉS DE LIMPIEZA (sección 8.6): contenedor aspect-ratio 16/9, dos escenas SVG (equipo con polvo y manchas / equipo limpio y brillante) con clip-path: inset(0 X% 0 0); manija circular de 44px con flechas, arrastrable con pointer events (pointer capture, sin lag), accesible con role="slider", aria-valuemin 0, aria-valuemax 100, aria-valuenow y teclas ← → (±5%), Home/End. Al entrar en vista, la manija hace un barrido de pista 50%→72%→50% en 900ms (una vez) para invitar a usarla. Las partículas de polvo de la escena "antes" se desvanecen al descubrirse la parte limpia (opacity ligada a la posición).
+12. LÍNEAS DE TIEMPO Y PASOS (Quiénes somos): la línea se dibuja con scaleY (vertical) o scaleX (horizontal) ligada al scroll; cada hito entra con reveal.
+13. MARQUEE DE MARCAS: desplazamiento infinito de 30 s lineal con transform; pausa en hover/foco; duplicar contenido con aria-hidden en la copia.
+14. FORMULARIO: errores aparecen con translateY(-4px)→0 + opacity en 150ms; el campo con error cambia de borde en 150ms (nada de "shake"). Éxito: círculo + check que se dibuja (stroke-dashoffset 400ms) y luego el texto.
+15. TOAST: translateY(12px)→0 + opacity en 220ms; salida en 160ms.
+16. CONTADOR DE STOCK BAJO ("Quedan 3"): sin animación (dato crítico, estático).
+11.4 Accesibilidad del movimiento
+- @media (prefers-reduced-motion: reduce): sin parallax, sin marquee en movimiento (mostrar fila estática con wrap), contadores muestran el valor final, reveals visibles de inmediato, el chip se muestra ya dibujado sin pulso, transiciones de contenido reducidas a fade de 100ms, sin barrido del slider ni vuelo al carrito (solo el pulso del contador sin escala).
+- Ninguna información depende solo de la animación.
+11.5 Rendimiento del movimiento
+- 60 fps: sin layout thrash (agrupa lecturas y escrituras del DOM), un solo IntersectionObserver reutilizado para reveals, requestAnimationFrame para contadores y spring, cancelación de animaciones al cambiar de vista.
+
+══════════════════════════════════════════
+12. COPY Y TONO
+══════════════════════════════════════════
+- Voz: directa, técnica sin jerga innecesaria, cercana, orientada a ayudar a elegir ("arma tu equipo"). Frases cortas. Cada palabra se gana su lugar: sin intros que repitan el título, sin superlativos vacíos ("el mejor", "increíble", "potencia tu futuro").
+- Botones: verbo + resultado ("Agregar al carrito", "Pedir asesoría gratis", "Cotizar mi equipo"). Evitar "Enviar" y "Click aquí".
+- Errores: dicen qué pasó y cómo corregirlo. Estados vacíos: ofrecen el siguiente paso.
+- Sin guiones largos (—) en los textos del sitio; usa comas, dos puntos o puntos.
+- Números y moneda: formato Intl.NumberFormat("es-EC"/configurable), siempre con dos decimales en precios con centavos.
+
+══════════════════════════════════════════
+13. ACCESIBILIDAD, SEO Y RENDIMIENTO
+══════════════════════════════════════════
+Accesibilidad (WCAG 2.2 AA):
+- Contraste ≥ 4.5:1 en texto normal y ≥ 3:1 en texto grande e íconos funcionales (verifica --text-faint y --brand sobre cada superficie; si no cumple, no lo uses para texto esencial).
+- Objetivos táctiles ≥ 44×44px. Foco visible siempre. Skip link "Saltar al contenido".
+- Un solo <h1> por vista, jerarquía sin saltos. Landmarks: header, nav, main, footer. Pestañas = <nav> con aria-current="page" (no role=tab).
+- Modales: role="dialog", aria-modal, aria-labelledby, focus trap, retorno del foco. Región aria-live para el contador de resultados y para el cambio de vista.
+- Tarjetas: un solo foco por tarjeta (el enlace principal); botones internos con aria-label descriptivo ("Agregar Laptop Creator 16 al carrito").
+- Imágenes/ilustraciones decorativas con aria-hidden; las informativas con título y descripción SVG.
+SEO (comentarios que expliquen las limitaciones):
+- <title> y meta description por vista; Open Graph; lang="es"; JSON-LD: Organization (con marcadores) y ItemList de Product con name, description, offers (price, priceCurrency, availability).
+- Contenido base de Inicio presente en el HTML; <noscript> con mensaje y enlace de WhatsApp.
+- Comentario en el código: "Las rutas por hash no se indexan por separado; para posicionar cada pestaña, migrar a páginas reales (/quienes-somos, /productos)".
+Rendimiento:
+- Objetivo Lighthouse ≥ 90 en las cuatro categorías; CLS ≈ 0 (reserva alto/aspect-ratio en todo medio); sin librerías; fuentes con display=swap; CSS crítico en línea (ya es un solo archivo).
+
+══════════════════════════════════════════
+14. PROHIBIDO (ANTI-SLOP)
+══════════════════════════════════════════
+- Gradientes morados o violeta; degradados decorativos sin función.
+- Bordes laterales de color en tarjetas o alertas.
+- Easing con rebote o elástico; glows oscuros o resplandores de neón.
+- Tarjetas anidadas dentro de tarjetas; rejillas de tarjetas idénticas sin jerarquía; todo centrado.
+- Emojis como íconos; imágenes de stock; cajas grises como producto.
+- Gris puro (#808080 y similares): siempre neutros con tinte azul.
+- Texto relleno ("Lorem ipsum") y cifras o certificaciones inventadas.
+- Líneas de texto de más de 75 caracteres; padding apretado (<12px en componentes interactivos); objetivos táctiles <44px; encabezados saltados.
+
+══════════════════════════════════════════
+15. AUTOAUDITORÍA FINAL (corrige antes de entregar)
+══════════════════════════════════════════
+[ ] Las 3 pestañas funcionan, el hash refleja el estado y Atrás/Adelante se comportan bien. Un enlace directo a #/producto/lap-02 abre el catálogo con el modal.
+[ ] TODA tarjeta enlaza a su destino del mapa (sección 4); Ctrl+clic abre en nueva pestaña; los botones internos no navegan.
+[ ] Los relacionados de cada producto y servicio existen en los datos (sin enlaces rotos).
+[ ] Filtros, búsqueda, orden, "Ver más", carrito (persistente), cantidad, quitar, y mensaje de WhatsApp correcto.
+[ ] Formulario valida, muestra errores útiles y estado de éxito.
+[ ] Ninguna animación de nivel A supera 200ms, ninguna usa ease-in o transition: all, ninguna parte de scale(0) ni rebota.
+[ ] Con prefers-reduced-motion activado, todo sigue siendo usable y completo.
+[ ] Todo se opera solo con teclado; el foco nunca se pierde; modales atrapan y devuelven el foco.
+[ ] Contraste AA, objetivos táctiles ≥44px, headings ordenados, longitud de línea ≤68ch.
+[ ] Responsive probado a 360, 390, 768, 1024, 1280 y 1536px de ancho sin scroll horizontal.
+[ ] Test anti-slop (sección 14): ¿parece diseñado por una persona o salido de una plantilla?
+[ ] Cada texto aporta algo; no hay datos inventados; todos los faltantes son [MARCADORES].
+
+══════════════════════════════════════════
+16. ENTREGA
+══════════════════════════════════════════
+- Entrega el/los archivo(s) completo(s) listos para abrir en el navegador, sin explicaciones largas antes del código.
+- Cierra con una lista de máximo 8 líneas: los [MARCADORES] que debo completar (nombre, logo, WhatsApp, zonas, garantía, marcas, productos reales, textos legales) y cualquier decisión importante que tomaste.
+
+DATOS QUE YO COMPLETO
+[NOMBRE_EMPRESA] | [LOGO] | [NÚMERO] (WhatsApp, con código de país) | [EMAIL] | [DIRECCIÓN] | [HORARIO] | [ZONAS] | [GARANTÍA_MESES] | [MARCA_1..6] | [DATOS_FISCALES] | [TEXTO_LEGAL] | [PRODUCTOS_Y_PRECIOS_REALES] | [PRECIOS_DE_SERVICIOS] | [TESTIMONIOS] | [HITOS] | [EQUIPO]
